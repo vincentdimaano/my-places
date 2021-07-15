@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 export const useHttpClient = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState();
 
   //will not be reinitialized when this fx runs again thru rerenders
   //this will store data across rerender cycles
@@ -25,16 +25,22 @@ export const useHttpClient = () => {
 
         const responseData = await response.json();
 
+        activeHttpRequests.current = activeHttpRequests.current.filter(
+          (reqCtrl) => reqCtrl !== httpAbortCtrl
+        );
+
         //response.ok = response status 2xx only
         if (!response.ok) {
           throw new Error(responseData.message);
         }
 
+        setIsLoading(false);
         return responseData;
       } catch (err) {
         setError(err.message);
+        setIsLoading(false);
+        throw err;
       }
-      setIsLoading(false);
     },
     []
   );
@@ -46,12 +52,13 @@ export const useHttpClient = () => {
   //runs when a component mounts.
   //using a return fx inside the fx argument will make it a cleanup fx
   //before useEffect runs again or when the component unmounts
-  //makes sure to never continue with a req that is on its way out 
+  //makes sure to never continue with a req that is on its way out
   //if we switch away from the component that triggers the req
-  useEffect(()=>{
+  useEffect(() => {
     return () => {
-      activeHttpRequests.current.forEach(abortCtrl => abortCtrl.abort());    };
-  },[]);
+      activeHttpRequests.current.forEach((abortCtrl) => abortCtrl.abort());
+    };
+  }, []);
 
-  return { isLoading, error, sendRequest };
+  return { isLoading, error, sendRequest, clearError };
 };
