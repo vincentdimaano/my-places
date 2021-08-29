@@ -3,26 +3,39 @@ import React, { useState, useContext } from 'react';
 import Card from '../../shared/components/UIElements/Card';
 import Button from '../../shared/components/form-elements/Button';
 import Modal from '../../shared/components/UIElements/Modal';
+import ErrorModal from '../../shared/components/UIElements/ErrorModal';
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner';
 import Map from '../../shared/components/UIElements/Map';
 import { AuthContext } from '../../shared/context/auth-context';
 import './PlaceItem.css';
+import { useHttpClient } from '../../shared/hooks/http-hook';
 
 const PlaceItem = (props) => {
   const auth = useContext(AuthContext);
   const [showMap, setShowMap] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const { error, clearError, isLoading, sendRequest } = useHttpClient();
 
   const openMapHandler = () => setShowMap(true);
   const closeMapHandler = () => setShowMap(false);
   const showDeleteHandler = () => setShowConfirmModal(true);
   const cancelDeleteHandler = () => setShowConfirmModal(false);
-  const confirmDeleteHandler = () => {
+
+  const confirmDeleteHandler = async () => {
     setShowConfirmModal(false);
-    console.log('Deleting...');
+    try {
+      await sendRequest(
+        `${process.env.REACT_APP_BACKEND_URL}/places/${props.id}`,
+        'DELETE', null,
+        {Authorization: 'Bearer ' + auth.token}
+      );
+      props.onDelete(props.id);
+    } catch (err) {}
   };
-  
+
   return (
     <React.Fragment>
+      <ErrorModal error={error} onClear={clearError}/>
       <Modal
         show={showMap}
         onCancel={closeMapHandler}
@@ -36,14 +49,18 @@ const PlaceItem = (props) => {
         </div>
       </Modal>
       <Modal
-      show={showConfirmModal}
-      onCancel={cancelDeleteHandler}
+        show={showConfirmModal}
+        onCancel={cancelDeleteHandler}
         header='Are you sure?'
         footerClass='place-item__modal-actions'
         footer={
           <React.Fragment>
-            <Button inverse onClick={cancelDeleteHandler}>CANCEL</Button>
-            <Button danger onClick={confirmDeleteHandler}>DELETE</Button>
+            <Button inverse onClick={cancelDeleteHandler}>
+              CANCEL
+            </Button>
+            <Button danger onClick={confirmDeleteHandler}>
+              DELETE
+            </Button>
           </React.Fragment>
         }
       >
@@ -53,9 +70,10 @@ const PlaceItem = (props) => {
         </p>
       </Modal>
       <Card className='place-item__content'>
+        {isLoading && <LoadingSpinner asOverlay/>}
         <li className='place-item'>
           <div className='place-item__image'>
-            <img src={props.image} alt={props.title} />
+            <img src={`${process.env.REACT_APP_SERVER_NAME}/${props.image}`} alt={props.title} />
           </div>
           <div className='place-item__info'>
             <h2>{props.title}</h2>
@@ -66,8 +84,14 @@ const PlaceItem = (props) => {
             <Button inverse onClick={openMapHandler}>
               VIEW ON MAP
             </Button>
-            {auth.isLoggedIn && <Button to={`/places/${props.id}`}>EDIT</Button>}
-            {auth.isLoggedIn && <Button danger onClick={showDeleteHandler}>DELETE</Button>}
+            {auth.userId === props.creatorId && (
+              <Button to={`/places/${props.id}`}>EDIT</Button>
+            )}
+            {auth.userId === props.creatorId && (
+              <Button danger onClick={showDeleteHandler}>
+                DELETE
+              </Button>
+            )}
           </div>
         </li>
       </Card>
